@@ -18,6 +18,9 @@ namespace RemoteControl.Common
         [DllImport("user32.dll")]
         static extern bool SetCursorPos(int x, int y);
 
+        [DllImport("user32.dll")]
+        static extern uint MapVirtualKey(uint uCode, uint uMapType);
+
         const uint MOUSEEVENTF_LEFTDOWN = 0x02;
         const uint MOUSEEVENTF_LEFTUP = 0x04;
         const uint MOUSEEVENTF_RIGHTDOWN = 0x08;
@@ -28,7 +31,9 @@ namespace RemoteControl.Common
         const uint KEYEVENTF_KEYDOWN = 0x0000;
         const uint KEYEVENTF_KEYUP = 0x0002;
         const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
+        const uint KEYEVENTF_SCANCODE = 0x0008;
         const uint INPUT_KEYBOARD = 1;
+        const uint MAPVK_VK_TO_VSC = 0;
 
         [StructLayout(LayoutKind.Sequential)]
         struct INPUT
@@ -87,9 +92,17 @@ namespace RemoteControl.Common
         {
             Keys key = (Keys)keyEvent.KeyCode;
             uint flags = keyEvent.IsKeyDown ? KEYEVENTF_KEYDOWN : KEYEVENTF_KEYUP;
+            uint scanCode = MapVirtualKey((uint)keyEvent.KeyCode, MAPVK_VK_TO_VSC);
+            bool useScanCode = scanCode != 0;
+
             if (IsExtendedKey(key))
             {
                 flags |= KEYEVENTF_EXTENDEDKEY;
+            }
+
+            if (useScanCode)
+            {
+                flags |= KEYEVENTF_SCANCODE;
             }
 
             var input = new INPUT
@@ -99,8 +112,8 @@ namespace RemoteControl.Common
                 {
                     ki = new KEYBDINPUT
                     {
-                        wVk = (ushort)keyEvent.KeyCode,
-                        wScan = 0,
+                        wVk = useScanCode ? (ushort)0 : (ushort)keyEvent.KeyCode,
+                        wScan = (ushort)scanCode,
                         dwFlags = flags,
                         time = 0,
                         dwExtraInfo = IntPtr.Zero

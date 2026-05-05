@@ -219,3 +219,18 @@ dotnet publish "RemoteControl.Server\RemoteControl.Server.csproj" -c Release -r 
 ## 備註
 
 這份文件是根據目前 `E:\Remote control` 內的實作狀態整理，適合作為後續續開發、交接與除錯的基礎說明。
+## 2026-05-05 鍵盤控制補強
+
+- Client `ScreenForm.cs`
+  - 攔截 `WM_SYSKEYDOWN` 與 `WM_SYSKEYUP`，讓 `Alt`、`F10` 這類系統鍵不會被 WinForms 吃掉。
+  - 追蹤目前按住的按鍵，視窗失焦或關閉時會主動補送對應的 KeyUp，避免遠端端卡住修飾鍵。
+- Common `InputSimulator.cs`
+  - 鍵盤模擬優先使用 scan code 搭配 `SendInput`，並保留 extended-key 標記，讓導覽鍵與組合鍵更接近實體鍵盤行為。
+
+建議回歸測試：
+1. 一般英數輸入
+2. `Shift` 加數字列符號，例如 `!`、`@`、`#`
+3. `Ctrl + C`、`Ctrl + V`、`Ctrl + A`
+4. `Alt + Tab`、`Alt + F4`、`Esc`
+5. 方向鍵、`Home/End`、`PageUp/PageDown`
+6. 按住修飾鍵後切回本機，再回到遠端，確認不會出現卡鍵

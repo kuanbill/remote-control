@@ -1,94 +1,110 @@
-# Windows 远程遥控软件
+# Windows 遠端遙控軟體
 
-基于 C#/.NET 8.0 开发的 Windows 远程控制软件，支持桌面查看、鼠标键盘控制和文件传输。
+這是一套以 C# / .NET 9 開發的 Windows 遠端控制工具，支援桌面檢視、滑鼠鍵盤控制與檔案傳輸。
 
-## 功能特性
+## 功能特色
 
-- **屏幕查看**: 实时查看远程计算机屏幕
-- **鼠标控制**: 远程控制鼠标移动、点击、滚动
-- **键盘控制**: 远程输入键盘指令
-- **文件传输**: 从客户端向服务器发送文件
-- **密码验证**: 连接时需要输入密码进行身份验证
-- **IP/端口配置**: 可自定义服务器IP地址和端口号
+- **畫面檢視**：即時查看遠端電腦畫面
+- **滑鼠控制**：遠端控制滑鼠移動、點擊與滾動
+- **鍵盤控制**：將本機按鍵操作傳送到遠端主機
+- **檔案傳輸**：由 Client 向 Server 傳送檔案
+- **密碼驗證**：連線時需輸入密碼進行身分驗證
+- **IP / 連接埠設定**：可自訂伺服器 IP 與連接埠
 
-## 项目结构
+## 專案結構
 
-```
+```text
 RemoteControl.sln
-├── RemoteControl.Common/    # 公共类库
-│   ├── MessageTypes.cs    # 消息类型定义
-│   ├── NetworkManager.cs  # 网络通信管理
-│   ├── ScreenCapture.cs   # 屏幕捕获
-│   └── InputSimulator.cs  # 输入模拟
-├── RemoteControl.Server/   # 服务器端(被控端)
+├── RemoteControl.Common/    # 共用類別庫
+│   ├── MessageTypes.cs      # 訊息型別與資料模型
+│   ├── NetworkManager.cs    # 網路通訊管理
+│   ├── ScreenCapture.cs     # 畫面擷取
+│   └── InputSimulator.cs    # 輸入模擬
+├── RemoteControl.Server/    # 伺服器端（被控端）
 │   ├── Program.cs
-│   └── ServerForm.cs
-└── RemoteControl.Client/   # 客户端(控制端)
-    ├── Program.cs
-    └── ClientForm.cs
+│   ├── ServerForm.cs
+│   └── ServerSettings.cs
+├── RemoteControl.Client/    # 用戶端（控制端）
+│   ├── ClientForm.cs
+│   └── ScreenForm.cs
+├── Publish/
+│   ├── Client/
+│   └── Server/
+└── ai-output/
+    └── development-guide.md
 ```
 
-## 使用说明
+## 環境需求
 
-### 环境要求
+- Windows 作業系統
+- .NET 9 SDK 或更高版本
+- Visual Studio 2022，或任何支援 .NET 9 的 IDE
 
-- .NET 8.0 SDK 或更高版本
-- Windows 操作系统
-- Visual Studio 2022 或支持 .NET 8.0 的 IDE
+## 開發與執行
 
-### 编译运行
+1. 以 Visual Studio 開啟 `RemoteControl.sln`
+2. 還原相依套件
+3. 建置方案
+4. 依用途選擇啟動專案：
+   - `RemoteControl.Server`：被控端
+   - `RemoteControl.Client`：控制端
 
-1. 使用 Visual Studio 打开 `RemoteControl.sln`
-2. 右键解决方案 → 还原 NuGet 包
-3. 生成解决方案 (Ctrl+Shift+B)
-4. 设置启动项目：
-   - 作为服务器运行：设置 `RemoteControl.Server` 为启动项目
-   - 作为客户端运行：设置 `RemoteControl.Client` 为启动项目
+也可以直接使用命令列建置：
 
-### 使用步骤
+```powershell
+dotnet build "E:\Remote control\RemoteControl.sln"
+```
 
-#### 服务器端 (被控端)
+## 基本使用方式
 
-1. 启动 `RemoteControl.Server`
-2. 查看显示的本机IP地址
-3. 设置端口号 (默认: 8888)
-4. 设置连接密码 (默认: 123456)
-5. 点击"启动服务"按钮
+### 伺服器端
 
-#### 客户端 (控制端)
+1. 啟動 `RemoteControl.Server`
+2. 確認畫面顯示的本機 IP
+3. 設定連接埠與密碼
+4. 保持程式在等待連線狀態
 
-1. 启动 `RemoteControl.Client`
-2. 输入服务器IP地址
-3. 输入服务器端口号
-4. 输入连接密码
-5. 点击"连接"按钮
-6. 连接成功后，右侧将显示远程屏幕
-7. 使用鼠标点击/拖动远程屏幕进行控制
-8. 键盘输入将自动传输到服务器
-9. 点击"发送文件"可将文件传输到服务器
+### 用戶端
 
-## 注意事项
+1. 啟動 `RemoteControl.Client`
+2. 輸入伺服器 IP、連接埠與密碼
+3. 點擊「連線」
+4. 連線成功後會開啟遠端桌面畫面
+5. 可直接以滑鼠、鍵盤操作遠端主機
+6. 需要時可透過「傳送檔案」將檔案送到遠端
 
-- 确保服务器和客户端在同一网络或可访问的网络环境
-- 防火墙可能需要允许程序通过或开放对应端口
-- 默认密码建议修改以提高安全性
-- 屏幕捕获间隔为100ms，可根据网络状况调整
+## 發佈
 
-## 技术栈
+目前專案使用單檔、自包含方式發佈。
 
-- C# / .NET 8.0
-- Windows Forms (UI)
-- System.Text.Json (序列化)
-- TCP Socket (网络通信)
-- GDI+ (屏幕捕获)
-- Win32 API (输入模拟)
+### Client
 
-## 后续改进建议
+```powershell
+dotnet publish "RemoteControl.Client\RemoteControl.Client.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o "E:\Remote control\Publish\Client"
+```
 
-- [ ] 添加图像压缩选项
-- [ ] 支持多显示器
-- [ ] 添加加密传输
-- [ ] 支持反向连接
-- [ ] 添加语音传输
-- [ ] 支持文件下载
-- [ ] 添加连接日志
+### Server
+
+```powershell
+dotnet publish "RemoteControl.Server\RemoteControl.Server.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o "E:\Remote control\Publish\Server"
+```
+
+## 注意事項
+
+- 建議修改預設密碼以提高安全性
+- 伺服器與用戶端需位於可互通的網路環境
+- 若遭防火牆阻擋，需允許程式通訊或開放對應連接埠
+- 若 `Publish\Server\RemoteControl.Server.exe` 被占用，發佈前請先關閉舊版 Server
+
+## 補充文件
+
+- 專案維護與交接說明請見 [ai-output/development-guide.md](E:\Remote control\ai-output\development-guide.md)
+
+## 後續可改進方向
+
+- 多螢幕切換
+- 更完整的鍵盤與輸入法支援
+- 加密傳輸
+- 自動重連
+- 傳輸與畫面壓縮效能優化
+- 操作與錯誤日誌

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -22,6 +23,10 @@ namespace RemoteControl.Client
         private Size _lastScreenViewSize = Size.Empty;
         private int _lastResolutionIndex = -1;
         private float _lastAppliedScaleFactor = -1f;
+        private readonly HashSet<Keys> _pressedKeys = new HashSet<Keys>();
+
+        private const int WM_SYSKEYDOWN = 0x0104;
+        private const int WM_SYSKEYUP = 0x0105;
 
         public event Action<MouseEventData> MouseEventOccurred;
         public event Action<KeyboardEventData> KeyboardEventOccurred;
@@ -34,6 +39,7 @@ namespace RemoteControl.Client
             KeyUp += ScreenForm_KeyUp;
             Resize += ScreenForm_Resize;
             Activated += ScreenForm_Activated;
+            Deactivate += ScreenForm_Deactivate;
         }
 
         private void InitializeComponent()
@@ -389,26 +395,23 @@ namespace RemoteControl.Client
         {
             e.SuppressKeyPress = true;
             e.Handled = true;
-            KeyboardEventOccurred?.Invoke(new KeyboardEventData
-            {
-                KeyCode = (int)e.KeyCode,
-                IsKeyDown = true
-            });
+            SendKeyboardEvent(e.KeyCode, isKeyDown: true);
         }
 
         private void ScreenForm_KeyUp(object sender, KeyEventArgs e)
         {
             e.Handled = true;
-            KeyboardEventOccurred?.Invoke(new KeyboardEventData
-            {
-                KeyCode = (int)e.KeyCode,
-                IsKeyDown = false
-            });
+            SendKeyboardEvent(e.KeyCode, isKeyDown: false);
         }
 
         private void ScreenForm_Activated(object sender, EventArgs e)
         {
             FocusInputSurface();
+        }
+
+        private void ScreenForm_Deactivate(object sender, EventArgs e)
+        {
+            ReleasePressedKeys();
         }
 
         private void FocusInputSurface()
@@ -417,6 +420,48 @@ namespace RemoteControl.Client
             {
                 _screenView.Focus();
             }
+        }
+
+        private void SendKeyboardEvent(Keys keyCode, bool isKeyDown)
+        {
+            if (keyCode == Keys.None)
+            {
+                return;
+            }
+
+            if (isKeyDown)
+            {
+                _pressedKeys.Add(keyCode);
+            }
+            else
+            {
+                _pressedKeys.Remove(keyCode);
+            }
+
+            KeyboardEventOccurred?.Invoke(new KeyboardEventData
+            {
+                KeyCode = (int)keyCode,
+                IsKeyDown = isKeyDown
+            });
+        }
+
+        private void ReleasePressedKeys()
+        {
+            if (_pressedKeys.Count == 0)
+            {
+                return;
+            }
+
+            foreach (Keys key in new List<Keys>(_pressedKeys))
+            {
+                KeyboardEventOccurred?.Invoke(new KeyboardEventData
+                {
+                    KeyCode = (int)key,
+                    IsKeyDown = false
+                });
+            }
+
+            _pressedKeys.Clear();
         }
 
         private static bool IsRemoteControlKey(Keys keyCode)
@@ -451,8 +496,23 @@ namespace RemoteControl.Client
             _screenView?.Invalidate();
         }
 
+        protected override void WndProc(ref System.Windows.Forms.Message m)
+        {
+            if (m.Msg == WM_SYSKEYDOWN || m.Msg == WM_SYSKEYUP)
+            {
+                Keys keyCode = (Keys)(int)m.WParam & Keys.KeyCode;
+                bool isKeyDown = m.Msg == WM_SYSKEYDOWN;
+
+                SendKeyboardEvent(keyCode, isKeyDown);
+                return;
+            }
+
+            base.WndProc(ref m);
+        }
+
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            ReleasePressedKeys();
             Hide();
             e.Cancel = true;
         }
