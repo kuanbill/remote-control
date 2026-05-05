@@ -24,7 +24,7 @@ RemoteControl.sln
 │   ├── Program.cs
 │   ├── ServerForm.cs
 │   └── ServerSettings.cs
-├── RemoteControl.Client/    # 用戶端（控制端）
+├── RemoteControl.Client/    # 客戶端（控制端）
 │   ├── ClientForm.cs
 │   └── ScreenForm.cs
 ├── Publish/
@@ -64,7 +64,7 @@ dotnet build "E:\Remote control\RemoteControl.sln"
 3. 設定連接埠與密碼
 4. 保持程式在等待連線狀態
 
-### 用戶端
+### 客戶端
 
 1. 啟動 `RemoteControl.Client`
 2. 輸入伺服器 IP、連接埠與密碼
@@ -92,7 +92,7 @@ dotnet publish "RemoteControl.Server\RemoteControl.Server.csproj" -c Release -r 
 ## 注意事項
 
 - 建議修改預設密碼以提高安全性
-- 伺服器與用戶端需位於可互通的網路環境
+- 伺服器與客戶端需位於可互通的網路環境
 - 若遭防火牆阻擋，需允許程式通訊或開放對應連接埠
 - 若 `Publish\Server\RemoteControl.Server.exe` 被占用，發佈前請先關閉舊版 Server
 

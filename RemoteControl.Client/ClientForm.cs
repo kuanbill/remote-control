@@ -37,7 +37,7 @@ namespace RemoteControl.Client
 
         private void InitializeComponent()
         {
-            Text = "遠端遙控 - 用戶端";
+            Text = "遠端遙控 - 客戶端";
             Size = new Size(400, 600);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;

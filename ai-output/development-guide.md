@@ -185,9 +185,9 @@ dotnet publish "RemoteControl.Server\RemoteControl.Server.csproj" -c Release -r 
 
 雖然 Server 端主要控制流程已重寫為可維護版本，但 Client 端和部分畫面上的字串仍可再完整整理一次，避免後續維護時再混入舊字串。
 
-### 3. 單用戶端模式
+### 3. 單客戶端模式
 
-目前 Server 設計是單一 Client 連線模式，不是多用戶端同時控制架構。
+目前 Server 設計是單一 Client 連線模式，不是多客戶端同時控制架構。
 
 ## 建議下一步
 

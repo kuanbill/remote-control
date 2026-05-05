@@ -277,16 +277,16 @@ namespace RemoteControl.Server
             _listener.Start();
             _isRunning = true;
             _cancellationToken = new CancellationTokenSource();
-            UpdateStatus("狀態: 等待用戶端連線...");
+            UpdateStatus("狀態: 等待客戶端連線...");
 
             try
             {
                 while (_isRunning && !_cancellationToken.IsCancellationRequested)
                 {
-                    UpdateStatus("狀態: 等待用戶端連線...");
+                    UpdateStatus("狀態: 等待客戶端連線...");
                     _client = await _listener.AcceptTcpClientAsync();
                     _networkManager = new NetworkManager(_client);
-                    UpdateStatus("狀態: 用戶端已連入");
+                    UpdateStatus("狀態: 客戶端已連入");
 
                     try
                     {
@@ -458,7 +458,7 @@ namespace RemoteControl.Server
             _networkManager = null;
             _client?.Close();
             _client = null;
-            UpdateStatus("狀態: 等待用戶端連線...");
+            UpdateStatus("狀態: 等待客戶端連線...");
         }
 
         private void HideToTray(bool showBalloon)
