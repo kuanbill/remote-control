@@ -33,6 +33,7 @@ namespace RemoteControl.Server
         private TextBox _txtPort;
         private TextBox _txtPassword;
         private Label _lblStatus;
+        private Label _lblKeyboardStatus;
 
         public ServerForm(bool startMinimized)
         {
@@ -88,7 +89,15 @@ namespace RemoteControl.Server
                 Size = new Size(360, 20)
             };
 
-            Controls.AddRange(new Control[] { lblIP, txtIP, lblPort, _txtPort, lblPassword, _txtPassword, _chkAutoStart, _lblStatus });
+            _lblKeyboardStatus = new Label
+            {
+                Name = "lblKeyboardStatus",
+                Text = "鍵盤: 尚未收到",
+                Location = new Point(20, 210),
+                Size = new Size(360, 20)
+            };
+
+            Controls.AddRange(new Control[] { lblIP, txtIP, lblPort, _txtPort, lblPassword, _txtPassword, _chkAutoStart, _lblStatus, _lblKeyboardStatus });
         }
 
         private void ServerForm_Shown(object sender, EventArgs e)
@@ -262,6 +271,17 @@ namespace RemoteControl.Server
             _lblStatus.Text = text;
         }
 
+        private void UpdateKeyboardStatus(string text)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action<string>(UpdateKeyboardStatus), text);
+                return;
+            }
+
+            _lblKeyboardStatus.Text = text;
+        }
+
         private async void ServerForm_Load(object sender, EventArgs e)
         {
             _password = _txtPassword.Text;
@@ -371,7 +391,10 @@ namespace RemoteControl.Server
         {
             if (message.Data is KeyboardEventData keyEvent)
             {
-                InputSimulator.SimulateKeyboardEvent(keyEvent);
+                var key = (Keys)keyEvent.KeyCode;
+                string direction = keyEvent.IsKeyDown ? "Down" : "Up";
+                string result = InputSimulator.SimulateKeyboardEvent(keyEvent);
+                UpdateKeyboardStatus($"鍵盤: {key} {direction}，{result}");
             }
         }
 

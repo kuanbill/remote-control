@@ -88,14 +88,16 @@ namespace RemoteControl.Common
             }
         }
 
-        public static void SimulateKeyboardEvent(KeyboardEventData keyEvent)
+        public static string SimulateKeyboardEvent(KeyboardEventData keyEvent)
         {
             Keys key = (Keys)keyEvent.KeyCode;
             uint flags = keyEvent.IsKeyDown ? KEYEVENTF_KEYDOWN : KEYEVENTF_KEYUP;
-            uint scanCode = MapVirtualKey((uint)keyEvent.KeyCode, MAPVK_VK_TO_VSC);
+            uint scanCode = keyEvent.ScanCode > 0
+                ? (uint)keyEvent.ScanCode
+                : MapVirtualKey((uint)keyEvent.KeyCode, MAPVK_VK_TO_VSC);
             bool useScanCode = scanCode != 0;
 
-            if (IsExtendedKey(key))
+            if (keyEvent.IsExtendedKey || IsExtendedKey(key))
             {
                 flags |= KEYEVENTF_EXTENDEDKEY;
             }
@@ -122,17 +124,20 @@ namespace RemoteControl.Common
             };
 
             uint sent = SendInput(1, new[] { input }, Marshal.SizeOf<INPUT>());
-            if (sent == 0)
+            if (sent > 0)
             {
-                if (keyEvent.IsKeyDown)
-                {
-                    keybd_event((byte)keyEvent.KeyCode, 0, flags, 0);
-                }
-                else
-                {
-                    keybd_event((byte)keyEvent.KeyCode, 0, flags, 0);
-                }
+                return "SendInput 成功";
             }
+
+            int error = Marshal.GetLastWin32Error();
+            uint fallbackFlags = keyEvent.IsKeyDown ? KEYEVENTF_KEYDOWN : KEYEVENTF_KEYUP;
+            if (keyEvent.IsExtendedKey || IsExtendedKey(key))
+            {
+                fallbackFlags |= KEYEVENTF_EXTENDEDKEY;
+            }
+
+            keybd_event((byte)keyEvent.KeyCode, (byte)(scanCode & 0xFF), fallbackFlags, 0);
+            return $"SendInput 失敗 {error}，已嘗試 keybd_event";
         }
 
         private static bool IsExtendedKey(Keys key)

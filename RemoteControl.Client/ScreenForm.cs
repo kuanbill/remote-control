@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using RemoteControl.Common;
 
@@ -18,28 +19,64 @@ namespace RemoteControl.Client
         private float _scaleFactor = 1.0f;
         private TrackBar _zoomTrackBar;
         private Label _lblZoom;
+        private Label _lblKeyboardStatus;
         private ComboBox _cmbResolution;
         private Point _remoteCursorPos = new Point(-1, -1);
         private Size _lastScreenViewSize = Size.Empty;
         private int _lastResolutionIndex = -1;
         private float _lastAppliedScaleFactor = -1f;
-        private readonly HashSet<Keys> _pressedKeys = new HashSet<Keys>();
+        private readonly Dictionary<Keys, KeyboardEventData> _pressedKeys = new Dictionary<Keys, KeyboardEventData>();
+        private readonly LowLevelKeyboardProc _keyboardProc;
+        private IntPtr _keyboardHook = IntPtr.Zero;
 
+        private const int WM_KEYDOWN = 0x0100;
+        private const int WM_KEYUP = 0x0101;
         private const int WM_SYSKEYDOWN = 0x0104;
         private const int WM_SYSKEYUP = 0x0105;
+        private const int WH_KEYBOARD_LL = 13;
+        private const int LLKHF_EXTENDED = 0x01;
+        private const int LLKHF_UP = 0x80;
 
         public event Action<MouseEventData> MouseEventOccurred;
         public event Action<KeyboardEventData> KeyboardEventOccurred;
 
+        private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct KBDLLHOOKSTRUCT
+        {
+            public uint vkCode;
+            public uint scanCode;
+            public uint flags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
         public ScreenForm()
         {
+            _keyboardProc = KeyboardHookCallback;
             InitializeComponent();
             KeyPreview = true;
-            KeyDown += ScreenForm_KeyDown;
-            KeyUp += ScreenForm_KeyUp;
             Resize += ScreenForm_Resize;
             Activated += ScreenForm_Activated;
             Deactivate += ScreenForm_Deactivate;
+            HandleCreated += ScreenForm_HandleCreated;
+            HandleDestroyed += ScreenForm_HandleDestroyed;
         }
 
         private void InitializeComponent()
@@ -81,7 +118,14 @@ namespace RemoteControl.Client
             };
             _zoomTrackBar.ValueChanged += ZoomTrackBar_ValueChanged;
 
-            panelTop.Controls.AddRange(new Control[] { lblResolution, _cmbResolution, _lblZoom, _zoomTrackBar });
+            _lblKeyboardStatus = new Label
+            {
+                Text = "鍵盤: 準備中",
+                Location = new Point(535, 12),
+                Size = new Size(240, 20)
+            };
+
+            panelTop.Controls.AddRange(new Control[] { lblResolution, _cmbResolution, _lblZoom, _zoomTrackBar, _lblKeyboardStatus });
 
             _panelContainer = new Panel
             {
@@ -391,22 +435,19 @@ namespace RemoteControl.Client
             });
         }
 
-        private void ScreenForm_KeyDown(object sender, KeyEventArgs e)
-        {
-            e.SuppressKeyPress = true;
-            e.Handled = true;
-            SendKeyboardEvent(e.KeyCode, isKeyDown: true);
-        }
-
-        private void ScreenForm_KeyUp(object sender, KeyEventArgs e)
-        {
-            e.Handled = true;
-            SendKeyboardEvent(e.KeyCode, isKeyDown: false);
-        }
-
         private void ScreenForm_Activated(object sender, EventArgs e)
         {
             FocusInputSurface();
+        }
+
+        private void ScreenForm_HandleCreated(object sender, EventArgs e)
+        {
+            InstallKeyboardHook();
+        }
+
+        private void ScreenForm_HandleDestroyed(object sender, EventArgs e)
+        {
+            RemoveKeyboardHook();
         }
 
         private void ScreenForm_Deactivate(object sender, EventArgs e)
@@ -418,11 +459,57 @@ namespace RemoteControl.Client
         {
             if (_screenView != null && _screenView.CanFocus)
             {
+                ActiveControl = _screenView;
+                _screenView.Select();
                 _screenView.Focus();
             }
         }
 
-        private void SendKeyboardEvent(Keys keyCode, bool isKeyDown)
+        private void InstallKeyboardHook()
+        {
+            if (_keyboardHook != IntPtr.Zero)
+            {
+                return;
+            }
+
+            _keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, _keyboardProc, GetModuleHandle(null), 0);
+            UpdateKeyboardStatus(_keyboardHook == IntPtr.Zero ? "鍵盤: 啟用失敗" : "鍵盤: 已啟用");
+        }
+
+        private void RemoveKeyboardHook()
+        {
+            if (_keyboardHook == IntPtr.Zero)
+            {
+                return;
+            }
+
+            UnhookWindowsHookEx(_keyboardHook);
+            _keyboardHook = IntPtr.Zero;
+            UpdateKeyboardStatus("鍵盤: 已停用");
+        }
+
+        private IntPtr KeyboardHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            if (nCode < 0 || !Visible || IsDisposed || GetForegroundWindow() != Handle)
+            {
+                return CallNextHookEx(_keyboardHook, nCode, wParam, lParam);
+            }
+
+            int message = wParam.ToInt32();
+            if (message != WM_KEYDOWN && message != WM_KEYUP && message != WM_SYSKEYDOWN && message != WM_SYSKEYUP)
+            {
+                return CallNextHookEx(_keyboardHook, nCode, wParam, lParam);
+            }
+
+            var keyboardData = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
+            bool isKeyDown = (keyboardData.flags & LLKHF_UP) == 0;
+            bool isExtendedKey = (keyboardData.flags & LLKHF_EXTENDED) != 0;
+            SendKeyboardEvent((Keys)keyboardData.vkCode, (int)keyboardData.scanCode, isExtendedKey, isKeyDown);
+
+            return (IntPtr)1;
+        }
+
+        private void SendKeyboardEvent(Keys keyCode, int scanCode, bool isExtendedKey, bool isKeyDown)
         {
             if (keyCode == Keys.None)
             {
@@ -431,7 +518,13 @@ namespace RemoteControl.Client
 
             if (isKeyDown)
             {
-                _pressedKeys.Add(keyCode);
+                _pressedKeys[keyCode] = new KeyboardEventData
+                {
+                    KeyCode = (int)keyCode,
+                    ScanCode = scanCode,
+                    IsExtendedKey = isExtendedKey,
+                    IsKeyDown = true
+                };
             }
             else
             {
@@ -441,8 +534,11 @@ namespace RemoteControl.Client
             KeyboardEventOccurred?.Invoke(new KeyboardEventData
             {
                 KeyCode = (int)keyCode,
+                ScanCode = scanCode,
+                IsExtendedKey = isExtendedKey,
                 IsKeyDown = isKeyDown
             });
+            UpdateKeyboardStatus($"鍵盤: 已送 {keyCode}");
         }
 
         private void ReleasePressedKeys()
@@ -452,16 +548,34 @@ namespace RemoteControl.Client
                 return;
             }
 
-            foreach (Keys key in new List<Keys>(_pressedKeys))
+            foreach (KeyboardEventData keyEvent in new List<KeyboardEventData>(_pressedKeys.Values))
             {
                 KeyboardEventOccurred?.Invoke(new KeyboardEventData
                 {
-                    KeyCode = (int)key,
+                    KeyCode = keyEvent.KeyCode,
+                    ScanCode = keyEvent.ScanCode,
+                    IsExtendedKey = keyEvent.IsExtendedKey,
                     IsKeyDown = false
                 });
             }
 
             _pressedKeys.Clear();
+        }
+
+        private void UpdateKeyboardStatus(string text)
+        {
+            if (_lblKeyboardStatus == null || _lblKeyboardStatus.IsDisposed)
+            {
+                return;
+            }
+
+            if (_lblKeyboardStatus.InvokeRequired)
+            {
+                _lblKeyboardStatus.BeginInvoke(new Action<string>(UpdateKeyboardStatus), text);
+                return;
+            }
+
+            _lblKeyboardStatus.Text = text;
         }
 
         private static bool IsRemoteControlKey(Keys keyCode)
@@ -496,23 +610,10 @@ namespace RemoteControl.Client
             _screenView?.Invalidate();
         }
 
-        protected override void WndProc(ref System.Windows.Forms.Message m)
-        {
-            if (m.Msg == WM_SYSKEYDOWN || m.Msg == WM_SYSKEYUP)
-            {
-                Keys keyCode = (Keys)(int)m.WParam & Keys.KeyCode;
-                bool isKeyDown = m.Msg == WM_SYSKEYDOWN;
-
-                SendKeyboardEvent(keyCode, isKeyDown);
-                return;
-            }
-
-            base.WndProc(ref m);
-        }
-
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             ReleasePressedKeys();
+            RemoveKeyboardHook();
             Hide();
             e.Cancel = true;
         }

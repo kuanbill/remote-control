@@ -70,6 +70,8 @@ namespace RemoteControl.Common
     public class KeyboardEventData
     {
         public int KeyCode { get; set; }
+        public int ScanCode { get; set; }
+        public bool IsExtendedKey { get; set; }
         public bool IsKeyDown { get; set; }
     }
 

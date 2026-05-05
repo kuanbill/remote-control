@@ -234,3 +234,18 @@ dotnet publish "RemoteControl.Server\RemoteControl.Server.csproj" -c Release -r 
 4. `Alt + Tab`、`Alt + F4`、`Esc`
 5. 方向鍵、`Home/End`、`PageUp/PageDown`
 6. 按住修飾鍵後切回本機，再回到遠端，確認不會出現卡鍵
+
+## 2026-05-05 鍵盤控制實測修正
+
+前一版焦點式鍵盤攔截仍會出現 Client 顯示有送出、Server 無反應的情況。已改成：
+
+- Client `ScreenForm.cs`
+  - 使用 `WH_KEYBOARD_LL` 低階鍵盤 hook，只在遠端桌面視窗為前景視窗時攔截按鍵。
+  - `KeyboardEventData` 會帶 `KeyCode`、`ScanCode`、`IsExtendedKey` 與 `IsKeyDown`，避免 Server 端用鍵碼反推實體按鍵。
+  - 遠端桌面上方顯示 `鍵盤: 已送 ...`，用來確認 Client 是否有抓到並送出按鍵。
+- Common `InputSimulator.cs`
+  - `SimulateKeyboardEvent` 回傳 `SendInput` 結果，失敗時會退回嘗試 `keybd_event`。
+- Server `ServerForm.cs`
+  - 主視窗顯示 `鍵盤: ...` 狀態，能確認 Server 是否收到事件，以及 `SendInput` 是否成功。
+
+已由使用者實測確認鍵盤控制正常運作。保留 Client/Server 的鍵盤狀態文字，方便日後排查輸入問題。
