@@ -116,6 +116,7 @@ namespace RemoteControl.Client
                     _screenForm = new ScreenForm();
                     _screenForm.MouseEventOccurred += ScreenForm_MouseEventOccurred;
                     _screenForm.KeyboardEventOccurred += ScreenForm_KeyboardEventOccurred;
+                    _screenForm.CtrlAltDelRequested += ScreenForm_CtrlAltDelRequested;
                     _screenForm.Show();
                     StartReceiving();
                     StartClipboardMonitor();
@@ -142,6 +143,20 @@ namespace RemoteControl.Client
                 if (_networkManager != null)
                 {
                     await _networkManager.SendMessageAsync(new Message { Type = MessageType.MouseEvent, Data = mouseEvent });
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private async void ScreenForm_CtrlAltDelRequested()
+        {
+            try
+            {
+                if (_networkManager != null)
+                {
+                    await _networkManager.SendMessageAsync(new Message { Type = MessageType.SendCtrlAltDel, Data = null });
                 }
             }
             catch
@@ -335,6 +350,7 @@ namespace RemoteControl.Client
             {
                 _screenForm.MouseEventOccurred -= ScreenForm_MouseEventOccurred;
                 _screenForm.KeyboardEventOccurred -= ScreenForm_KeyboardEventOccurred;
+                _screenForm.CtrlAltDelRequested -= ScreenForm_CtrlAltDelRequested;
                 _screenForm.Close();
                 _screenForm = null;
             }

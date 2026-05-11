@@ -364,6 +364,9 @@ namespace RemoteControl.Server
                     case MessageType.ClipboardData:
                         HandleClipboardData(message);
                         break;
+                    case MessageType.SendCtrlAltDel:
+                        HandleSendCtrlAltDel();
+                        break;
                 }
             }
         }
@@ -461,6 +464,12 @@ namespace RemoteControl.Server
                     _isUpdatingClipboard = false;
                 }
             }
+        }
+
+        private void HandleSendCtrlAltDel()
+        {
+            bool success = InputSimulator.SendCtrlAltDel();
+            UpdateKeyboardStatus(success ? "Ctrl+Alt+Del 已送出" : "Ctrl+Alt+Del 送出失敗");
         }
 
         private void StartClipboardMonitor()

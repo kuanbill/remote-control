@@ -18,6 +18,9 @@ namespace RemoteControl.Common
         [DllImport("user32.dll")]
         public static extern uint GetClipboardSequenceNumber();
 
+        [DllImport("sas.dll", SetLastError = true)]
+        private static extern int SendSAS(bool asUser);
+
         const uint INPUT_MOUSE = 0;
         const uint MOUSEEVENTF_MOVE = 0x0001;
         const uint MOUSEEVENTF_ABSOLUTE = 0x8000;
@@ -180,6 +183,19 @@ namespace RemoteControl.Common
 
             keybd_event((byte)keyEvent.KeyCode, (byte)(scanCode & 0xFF), fallbackFlags, 0);
             return $"SendInput 失敗 {error}，已嘗試 keybd_event";
+        }
+
+        public static bool SendCtrlAltDel()
+        {
+            try
+            {
+                int result = SendSAS(true);
+                return result != 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static bool IsExtendedKey(Keys key)

@@ -16,7 +16,8 @@ namespace RemoteControl.Common
         FileTransferResponse,
         FileTransferData,
         FileTransferComplete,
-        ClipboardData
+        ClipboardData,
+        SendCtrlAltDel
     }
 
     public class Message

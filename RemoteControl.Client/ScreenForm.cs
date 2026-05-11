@@ -39,6 +39,7 @@ namespace RemoteControl.Client
 
         public event Action<MouseEventData> MouseEventOccurred;
         public event Action<KeyboardEventData> KeyboardEventOccurred;
+        public event Action CtrlAltDelRequested;
 
         private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
@@ -125,7 +126,16 @@ namespace RemoteControl.Client
                 Size = new Size(240, 20)
             };
 
-            panelTop.Controls.AddRange(new Control[] { lblResolution, _cmbResolution, _lblZoom, _zoomTrackBar, _lblKeyboardStatus });
+            var btnCtrlAltDel = new Button
+            {
+                Text = "送出 Ctrl+Alt+Del",
+                Location = new Point(790, 8),
+                Size = new Size(140, 24),
+                FlatStyle = FlatStyle.Flat
+            };
+            btnCtrlAltDel.Click += BtnCtrlAltDel_Click;
+
+            panelTop.Controls.AddRange(new Control[] { lblResolution, _cmbResolution, _lblZoom, _zoomTrackBar, _lblKeyboardStatus, btnCtrlAltDel });
 
             _panelContainer = new Panel
             {
@@ -560,6 +570,12 @@ namespace RemoteControl.Client
             }
 
             _pressedKeys.Clear();
+        }
+
+        private void BtnCtrlAltDel_Click(object sender, EventArgs e)
+        {
+            CtrlAltDelRequested?.Invoke();
+            UpdateKeyboardStatus("鍵盤: 已送出 Ctrl+Alt+Del");
         }
 
         private void UpdateKeyboardStatus(string text)
