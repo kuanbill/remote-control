@@ -26,6 +26,9 @@ namespace RemoteControl.Client
         private bool _isConnected;
         private ScreenForm _screenForm;
         private ListBox _serverList;
+        private Timer _clipboardTimer;
+        private uint _lastClipboardSeq;
+        private bool _isUpdatingClipboard;
 
         private const string SavedServersFile = "saved_servers.json";
 
@@ -115,6 +118,7 @@ namespace RemoteControl.Client
                     _screenForm.KeyboardEventOccurred += ScreenForm_KeyboardEventOccurred;
                     _screenForm.Show();
                     StartReceiving();
+                    StartClipboardMonitor();
                 }
                 else
                 {
@@ -214,22 +218,15 @@ namespace RemoteControl.Client
                 while (_isConnected && _client != null && _client.Connected)
                 {
                     var message = await _networkManager.ReceiveMessageAsync();
-                    if (message.Type != MessageType.ScreenCapture)
+                    switch (message.Type)
                     {
-                        continue;
+                        case MessageType.ScreenCapture:
+                            HandleReceivedScreenCapture(message);
+                            break;
+                        case MessageType.ClipboardData:
+                            HandleReceivedClipboardData(message);
+                            break;
                     }
-
-                    var screenData = message.Data as ScreenData;
-                    if (screenData == null || _screenForm == null || _screenForm.IsDisposed)
-                    {
-                        continue;
-                    }
-
-                    _screenForm.BeginInvoke(new Action(() =>
-                    {
-                        _screenForm.UpdateScreen(screenData);
-                        _screenForm.UpdateRemoteCursor(new Point(screenData.CursorX, screenData.CursorY));
-                    }));
                 }
             }
             catch (Exception ex)
@@ -243,8 +240,95 @@ namespace RemoteControl.Client
             }
         }
 
+        private void HandleReceivedScreenCapture(Message message)
+        {
+            var screenData = message.Data as ScreenData;
+            if (screenData == null || _screenForm == null || _screenForm.IsDisposed)
+            {
+                return;
+            }
+
+            _screenForm.BeginInvoke(new Action(() =>
+            {
+                _screenForm.UpdateScreen(screenData);
+                _screenForm.UpdateRemoteCursor(new Point(screenData.CursorX, screenData.CursorY));
+            }));
+        }
+
+        private void HandleReceivedClipboardData(Message message)
+        {
+            if (message.Data is ClipboardContent content && !string.IsNullOrEmpty(content.Text))
+            {
+                _isUpdatingClipboard = true;
+                try
+                {
+                    Clipboard.SetText(content.Text);
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    _isUpdatingClipboard = false;
+                }
+            }
+        }
+
+        private void StartClipboardMonitor()
+        {
+            if (_clipboardTimer != null)
+            {
+                return;
+            }
+
+            _clipboardTimer = new Timer { Interval = 500 };
+            _clipboardTimer.Tick += ClipboardTimer_Tick;
+            _clipboardTimer.Start();
+        }
+
+        private async void ClipboardTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                uint currentSeq = InputSimulator.GetClipboardSequenceNumber();
+                if (currentSeq != _lastClipboardSeq && !_isUpdatingClipboard)
+                {
+                    _lastClipboardSeq = currentSeq;
+                    if (Clipboard.ContainsText())
+                    {
+                        string text = Clipboard.GetText();
+                        if (!string.IsNullOrEmpty(text) && _networkManager != null)
+                        {
+                            await _networkManager.SendMessageAsync(new Message
+                            {
+                                Type = MessageType.ClipboardData,
+                                Data = new ClipboardContent { Text = text }
+                            });
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private void StopClipboardMonitor()
+        {
+            if (_clipboardTimer != null)
+            {
+                _clipboardTimer.Stop();
+                _clipboardTimer.Dispose();
+                _clipboardTimer = null;
+            }
+
+            _lastClipboardSeq = 0;
+            _isUpdatingClipboard = false;
+        }
+
         private void Disconnect()
         {
+            StopClipboardMonitor();
             _isConnected = false;
 
             if (_screenForm != null)

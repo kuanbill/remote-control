@@ -34,6 +34,9 @@ namespace RemoteControl.Server
         private TextBox _txtPassword;
         private Label _lblStatus;
         private Label _lblKeyboardStatus;
+        private System.Windows.Forms.Timer _clipboardTimer;
+        private uint _lastClipboardSeq;
+        private bool _isUpdatingClipboard;
 
         public ServerForm(bool startMinimized)
         {
@@ -358,6 +361,9 @@ namespace RemoteControl.Server
                     case MessageType.FileTransferComplete:
                         HandleFileTransferComplete();
                         break;
+                    case MessageType.ClipboardData:
+                        HandleClipboardData(message);
+                        break;
                 }
             }
         }
@@ -376,6 +382,7 @@ namespace RemoteControl.Server
             if (response.Success)
             {
                 StartScreenCapture();
+                StartClipboardMonitor();
             }
         }
 
@@ -437,6 +444,77 @@ namespace RemoteControl.Server
             MessageBox.Show($"檔案接收完成: {_receivingFilePath}");
         }
 
+        private void HandleClipboardData(Message message)
+        {
+            if (message.Data is ClipboardContent content && !string.IsNullOrEmpty(content.Text))
+            {
+                _isUpdatingClipboard = true;
+                try
+                {
+                    Clipboard.SetText(content.Text);
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    _isUpdatingClipboard = false;
+                }
+            }
+        }
+
+        private void StartClipboardMonitor()
+        {
+            if (_clipboardTimer != null)
+            {
+                return;
+            }
+
+            _clipboardTimer = new System.Windows.Forms.Timer { Interval = 500 };
+            _clipboardTimer.Tick += ClipboardTimer_Tick;
+            _clipboardTimer.Start();
+        }
+
+        private async void ClipboardTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                uint currentSeq = InputSimulator.GetClipboardSequenceNumber();
+                if (currentSeq != _lastClipboardSeq && !_isUpdatingClipboard)
+                {
+                    _lastClipboardSeq = currentSeq;
+                    if (Clipboard.ContainsText())
+                    {
+                        string text = Clipboard.GetText();
+                        if (!string.IsNullOrEmpty(text) && _networkManager != null)
+                        {
+                            await _networkManager.SendMessageAsync(new Message
+                            {
+                                Type = MessageType.ClipboardData,
+                                Data = new ClipboardContent { Text = text }
+                            });
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private void StopClipboardMonitor()
+        {
+            if (_clipboardTimer != null)
+            {
+                _clipboardTimer.Stop();
+                _clipboardTimer.Dispose();
+                _clipboardTimer = null;
+            }
+
+            _lastClipboardSeq = 0;
+            _isUpdatingClipboard = false;
+        }
+
         private void StartScreenCapture()
         {
             _ = Task.Run(async () =>
@@ -475,6 +553,7 @@ namespace RemoteControl.Server
 
         private void CleanupClientConnection()
         {
+            StopClipboardMonitor();
             _receivingFile?.Dispose();
             _receivingFile = null;
             _networkManager?.Dispose();
@@ -507,6 +586,7 @@ namespace RemoteControl.Server
         private void StopServer()
         {
             _isRunning = false;
+            StopClipboardMonitor();
             _cancellationToken?.Cancel();
             _receivingFile?.Dispose();
             _receivingFile = null;

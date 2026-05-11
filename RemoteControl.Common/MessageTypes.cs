@@ -15,7 +15,8 @@ namespace RemoteControl.Common
         FileTransferRequest,
         FileTransferResponse,
         FileTransferData,
-        FileTransferComplete
+        FileTransferComplete,
+        ClipboardData
     }
 
     public class Message
@@ -80,5 +81,10 @@ namespace RemoteControl.Common
         public string FileName { get; set; }
         public long FileSize { get; set; }
         public string TargetPath { get; set; }
+    }
+
+    public class ClipboardContent
+    {
+        public string Text { get; set; }
     }
 }

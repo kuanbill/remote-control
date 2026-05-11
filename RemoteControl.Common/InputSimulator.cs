@@ -7,20 +7,20 @@ namespace RemoteControl.Common
     public static class InputSimulator
     {
         [DllImport("user32.dll")]
-        static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, int dwExtraInfo);
-
-        [DllImport("user32.dll")]
         static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
 
         [DllImport("user32.dll", SetLastError = true)]
         static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
         [DllImport("user32.dll")]
-        static extern bool SetCursorPos(int x, int y);
-
-        [DllImport("user32.dll")]
         static extern uint MapVirtualKey(uint uCode, uint uMapType);
 
+        [DllImport("user32.dll")]
+        public static extern uint GetClipboardSequenceNumber();
+
+        const uint INPUT_MOUSE = 0;
+        const uint MOUSEEVENTF_MOVE = 0x0001;
+        const uint MOUSEEVENTF_ABSOLUTE = 0x8000;
         const uint MOUSEEVENTF_LEFTDOWN = 0x02;
         const uint MOUSEEVENTF_LEFTUP = 0x04;
         const uint MOUSEEVENTF_RIGHTDOWN = 0x08;
@@ -46,7 +46,20 @@ namespace RemoteControl.Common
         struct InputUnion
         {
             [FieldOffset(0)]
+            public MOUSEINPUT mi;
+            [FieldOffset(0)]
             public KEYBDINPUT ki;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct MOUSEINPUT
+        {
+            public int dx;
+            public int dy;
+            public uint mouseData;
+            public uint dwFlags;
+            public uint time;
+            public IntPtr dwExtraInfo;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -61,31 +74,60 @@ namespace RemoteControl.Common
 
         public static void SimulateMouseEvent(MouseEventData mouseEvent)
         {
-            SetCursorPos(mouseEvent.X, mouseEvent.Y);
+            uint flags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE;
+            uint mouseData = 0;
+
             switch (mouseEvent.EventType)
             {
+                case MouseEventType.Move:
+                    break;
                 case MouseEventType.LeftDown:
-                    mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+                    flags |= MOUSEEVENTF_LEFTDOWN;
                     break;
                 case MouseEventType.LeftUp:
-                    mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+                    flags |= MOUSEEVENTF_LEFTUP;
                     break;
                 case MouseEventType.RightDown:
-                    mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
+                    flags |= MOUSEEVENTF_RIGHTDOWN;
                     break;
                 case MouseEventType.RightUp:
-                    mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
+                    flags |= MOUSEEVENTF_RIGHTUP;
                     break;
                 case MouseEventType.MiddleDown:
-                    mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, 0);
+                    flags |= MOUSEEVENTF_MIDDLEDOWN;
                     break;
                 case MouseEventType.MiddleUp:
-                    mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, 0);
+                    flags |= MOUSEEVENTF_MIDDLEUP;
                     break;
                 case MouseEventType.Wheel:
-                    mouse_event(MOUSEEVENTF_WHEEL, 0, 0, (uint)mouseEvent.Button, 0);
+                    flags |= MOUSEEVENTF_WHEEL;
+                    mouseData = (uint)mouseEvent.Button;
                     break;
             }
+
+            int screenWidth = System.Windows.Forms.Screen.PrimaryScreen.Bounds.Width;
+            int screenHeight = System.Windows.Forms.Screen.PrimaryScreen.Bounds.Height;
+            int absX = (mouseEvent.X * 65535) / screenWidth;
+            int absY = (mouseEvent.Y * 65535) / screenHeight;
+
+            var input = new INPUT
+            {
+                type = INPUT_MOUSE,
+                U = new InputUnion
+                {
+                    mi = new MOUSEINPUT
+                    {
+                        dx = absX,
+                        dy = absY,
+                        mouseData = mouseData,
+                        dwFlags = flags,
+                        time = 0,
+                        dwExtraInfo = IntPtr.Zero
+                    }
+                }
+            };
+
+            SendInput(1, new[] { input }, Marshal.SizeOf<INPUT>());
         }
 
         public static string SimulateKeyboardEvent(KeyboardEventData keyEvent)

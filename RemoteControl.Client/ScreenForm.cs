@@ -506,7 +506,7 @@ namespace RemoteControl.Client
             bool isExtendedKey = (keyboardData.flags & LLKHF_EXTENDED) != 0;
             SendKeyboardEvent((Keys)keyboardData.vkCode, (int)keyboardData.scanCode, isExtendedKey, isKeyDown);
 
-            return (IntPtr)1;
+            return CallNextHookEx(_keyboardHook, nCode, wParam, lParam);
         }
 
         private void SendKeyboardEvent(Keys keyCode, int scanCode, bool isExtendedKey, bool isKeyDown)

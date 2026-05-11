@@ -50,6 +50,7 @@ namespace RemoteControl.Common
                             MessageType.FileTransferRequest => JsonSerializer.Deserialize<FileTransferInfo>(ref reader, options),
                             MessageType.FileTransferData => JsonSerializer.Deserialize<byte[]>(ref reader, options),
                             MessageType.FileTransferResponse => JsonSerializer.Deserialize<bool>(ref reader, options),
+                            MessageType.ClipboardData => JsonSerializer.Deserialize<ClipboardContent>(ref reader, options),
                             _ => null
                         };
                         break;
